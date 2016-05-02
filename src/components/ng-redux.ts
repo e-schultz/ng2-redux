@@ -13,6 +13,8 @@ const ERROR_MESSAGE = `Expected selector to be one of:
 ${VALID_SELECTORS.join(',')}. Instead recieved %s`;
 const checkSelector = (s) => VALID_SELECTORS.indexOf(typeof s, 0) >= 0;
 
+let scopeSingleton;
+
 @Injectable()
 export class NgRedux<RootState> {
     private _store: Redux.Store<RootState>;
@@ -26,6 +28,7 @@ export class NgRedux<RootState> {
      * @param {Redux.Store<RootState>} store Redux store 
      */
     constructor(store: Redux.Store<RootState>) {
+        scopeSingleton = this;
         this._store = store;
         this._store$ = this.observableFromStore(store);
         this._store.subscribe(() => this._store$.next(this._store.getState()));
@@ -210,7 +213,7 @@ export class NgRedux<RootState> {
 
 }
 
-export const Select = <T>(stateKeyOrFunc?) => (target, key) => {
+export const select = <T>(stateKeyOrFunc?) => (target, key) => {
     let bindingKey = (key.lastIndexOf('$') === key.length - 1) ? key.substring(0, key.length - 1) : key;
 
     if (typeof stateKeyOrFunc === 'string') {
@@ -236,3 +239,11 @@ export const Select = <T>(stateKeyOrFunc?) => (target, key) => {
     }
 }
 
+export const dispatchAll = (obj) => (targetClass) => {
+    Object.keys(obj).filter(key => typeof obj[key] === 'function')
+        .forEach(key => targetClass.prototype[key] = () => scopeSingleton.dispatch(<any>obj[key]()));
+};
+
+export const dispatch = (func) => (targetClass, key) => {
+    targetClass[key] = () => scopeSingleton.dispatch(<any>func());
+};
